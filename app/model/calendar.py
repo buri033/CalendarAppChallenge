@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from datetime import datetime, date, time
-from typing import ClassVar
+from datetime import datetime, date, time, timedelta
+from typing import ClassVar, Optional
 
 from app.services.util import generate_unique_id, date_lower_than_today_error, event_not_found_error, \
     reminder_not_found_error, slot_not_available_error
@@ -57,6 +57,48 @@ class Event:
                 f"Time: {self.start_at} - {self.end_at}")
 
 # TODO: Implement Day class here
+class Day:
+    def __init__(self, date_: date) -> None:
+        self.date_ = date_
+        self.slots: dict[time, Optional[str]] = {}
+        self._init_slots()
+
+    def _init_slots(self) -> None:
+        for hour in range(24):
+            for minute in range(0, 60, 15):
+                self.slots[time(hour, minute)] = None
+
+    def add_event(self, event_id: str, start_at: time, end_at: time) -> None:
+        current_time = start_at
+        while current_time < end_at:
+            if self.slots.get(current_time) is not None:
+                slot_not_available_error()
+            self.slots[current_time] = event_id
+            current_time = (datetime.combine(date.min, current_time) + timedelta(minutes=15)).time()
+
+    def delete_event(self, event_id: str):
+        deleted = False
+        for slot, saved_id in self.slots.items():
+            if saved_id == event_id:
+                self.slots[slot] = None
+                deleted = True
+        if not deleted:
+            event_not_found_error()
+
+    def update_event(self, event_id: str, start_at: time, end_at: time):
+        for slot in self.slots:
+            if self.slots[slot] == event_id:
+                self.slots[slot] = None
+
+        for slot in self.slots:
+            if start_at <= slot < end_at:
+                if self.slots[slot]:
+                    slot_not_available_error()
+                else:
+                    self.slots[slot] = event_id
+
+    def find_available_slots(self) -> list[time]:
+        return [slot for slot, event_id in self.slots.items() if event_id is None]
 
 
 # TODO: Implement Calendar class here
